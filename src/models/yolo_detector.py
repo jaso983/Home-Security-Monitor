@@ -18,7 +18,7 @@ class YoloDetector:
 
     def detect_person(self, frame):
         """检测人员"""
-        results = self.person_model(frame, classes=[0], verbose=False)
+        results = self.person_model(frame, conf=0.8, classes=[0], verbose=False)
         has_person = False
         annotated_frame = frame.copy()
         for result in results:
@@ -28,8 +28,8 @@ class YoloDetector:
         return has_person, annotated_frame
 
     def detect_fire(self, frame):
-        """检测火焰和烟雾 - 在原始frame上检测，不在人员检测后的frame上"""
-        results = self.fire_model(frame, conf=0.4, verbose=False)
+        """检测火焰和烟雾 — 仅关注 fire(3) 和 fire-smoke(0)，忽略 fog/sol/factory-smoke"""
+        results = self.fire_model(frame, conf=0.8, classes=[0, 3], verbose=False)
         has_fire = False
         annotated_frame = frame.copy()
         for result in results:
