@@ -1,0 +1,34 @@
+# Home Security Monitor 配置文件
+
+monitor:
+  person_start: "00:00"    # 人员检测开始时段
+  person_end: "23:59"      # 人员检测结束时段
+
+alarm:
+  cooldown_seconds: 10     # 同类报警冷却时间（秒）
+
+detection:
+  person_conf: 0.8         # 人员检测置信度阈值
+  person_classes: [0]       # 人员检测 COCO 类别（0=person）
+  fire_conf: 0.8           # 火焰检测置信度阈值
+  fire_classes: [0, 1]      # 火焰检测类别（自训练模型: 0=fire, 1=smoke）
+  fire_model_path: ""       # 火焰模型路径，空则使用 src/models/fire_model.pt
+
+camera:
+  device_id: 0             # 摄像头设备 ID
+  width: 640               # 视频宽度
+  height: 480              # 视频高度
+
+recognition:
+  faces_dir: "src/models/family_faces"  # 家庭成员照片目录
+  tolerance: 80.0                       # LBPH 置信度阈值，越小越严格
+
+gui:
+  loop_delay_ms: 30        # GUI 检测循环间隔（毫秒）
+  fps_interval: 1.0        # FPS 刷新间隔（秒）
+  min_width: 1024          # 窗口最小宽度
+  min_height: 700          # 窗口最小高度
+
+logging:
+  level: "INFO"            # 日志级别
+  file: "security_monitor.log"  # 日志文件名（相对于项目根目录）

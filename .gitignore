@@ -220,8 +220,16 @@ __marimo__/
 *.pt
 
 # Project runtime artifacts
-src/screenshots/
+screenshots/
 *.db
+
+# Training artifacts
+training/data/
+training/runs/
+runs/
+
+# Family face encodings cache
+src/models/family_faces/*.npy
 
 # Claude Code
 .claude/

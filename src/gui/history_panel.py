@@ -2,10 +2,22 @@ import os
 import subprocess
 import tkinter as tk
 from tkinter import ttk, messagebox
+from typing import Optional, Tuple
+
+from core.db_manager import DatabaseManager
 
 
 class HistoryPanel(ttk.LabelFrame):
-    def __init__(self, parent, db_manager):
+    """报警历史面板，以 Treeview 列表展示和管理报警记录。"""
+
+    def __init__(self, parent: tk.Widget, db_manager: DatabaseManager) -> None:
+        """
+        初始化历史面板。
+
+        Args:
+            parent: 父级 tkinter 容器。
+            db_manager: 数据库管理器实例。
+        """
         super().__init__(parent, text="Alarm History", padding=5)
         self._db = db_manager
 
@@ -39,7 +51,8 @@ class HistoryPanel(ttk.LabelFrame):
 
         self.refresh()
 
-    def refresh(self):
+    def refresh(self) -> None:
+        """从数据库重新加载报警记录到列表。"""
         for item in self._tree.get_children():
             self._tree.delete(item)
         try:
@@ -51,7 +64,8 @@ class HistoryPanel(ttk.LabelFrame):
             tag = event_type if event_type in ("fire", "person") else ""
             self._tree.insert("", tk.END, values=(row_id, event_type, timestamp, image_path), tags=(tag,))
 
-    def _on_double_click(self, event):
+    def _on_double_click(self, event: tk.Event) -> None:
+        """双击行时打开对应截图文件。"""
         selection = self._tree.selection()
         if not selection:
             return
@@ -67,13 +81,25 @@ class HistoryPanel(ttk.LabelFrame):
         else:
             messagebox.showwarning("File Not Found", f"Screenshot not found:\n{image_path}")
 
-    def get_selected_alarm(self):
+    def get_selected_alarm(self) -> Optional[Tuple]:
+        """
+        获取当前选中的报警记录。
+
+        Returns:
+            (id, event_type, timestamp, image_path) 元组，无选中时返回 None。
+        """
         selection = self._tree.selection()
         if not selection:
             return None
         return self._tree.item(selection[0], "values")
 
-    def delete_selected(self):
+    def delete_selected(self) -> bool:
+        """
+        删除当前选中的报警记录。
+
+        Returns:
+            是否成功删除。
+        """
         selection = self._tree.selection()
         if not selection:
             return False
@@ -85,6 +111,7 @@ class HistoryPanel(ttk.LabelFrame):
         self.refresh()
         return True
 
-    def clear_all(self):
+    def clear_all(self) -> None:
+        """清空所有报警记录。"""
         self._db.clear_all()
         self.refresh()
