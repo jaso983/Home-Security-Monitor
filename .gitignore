@@ -217,7 +217,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-*.pt
+# Model files (track small models, ignore training artifacts)
+*.pth
 
 # Project runtime artifacts
 screenshots/
