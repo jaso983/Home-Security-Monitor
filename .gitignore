@@ -227,6 +227,7 @@ screenshots/
 # Training artifacts
 training/data/
 training/runs/
+training/home_fire_temp/
 runs/
 
 # Family face encodings cache
