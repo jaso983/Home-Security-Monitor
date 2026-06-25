@@ -1,0 +1,12 @@
+"""深色主题色彩常量（Material Design 3 风格）。"""
+
+BG = "#1E1E2E"
+CARD = "#2D2D3F"
+BORDER = "#3D3D5C"
+TEXT = "#E0E0E0"
+TEXT_DIM = "#9E9E9E"
+ACCENT = "#7C4DFF"
+RED = "#FF5252"
+GREEN = "#4CAF50"
+ORANGE = "#FFB74D"
+BLUE = "#42A5F5"

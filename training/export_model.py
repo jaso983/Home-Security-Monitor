@@ -9,7 +9,7 @@ import shutil
 
 
 def export_model(
-    source: str = os.path.join("runs", "detect", "training", "runs", "fire_smoke", "weights", "best.pt"),
+    source: str = os.path.join("training", "runs", "home_fire", "weights", "best.pt"),
     target: str = os.path.join("src", "models", "fire_model.pt"),
 ) -> None:
     """导出训练模型到部署目录。"""

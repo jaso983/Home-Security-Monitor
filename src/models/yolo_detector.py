@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import cv2
 import os
 import logging
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, List
 
 import numpy as np
 
@@ -31,32 +31,37 @@ class YoloDetector:
         self.fire_model = YOLO(fire_model_path)
         logger.info("Fire model classes: %s", self.fire_model.names)
 
-        self._person_conf = det_cfg.get("person_conf", 0.8)
+        self._person_conf = det_cfg.get("person_conf", 0.5)
         self._person_classes = det_cfg.get("person_classes", [0])
-        self._fire_conf = det_cfg.get("fire_conf", 0.8)
+        self._fire_conf = det_cfg.get("fire_conf", 0.7)
         self._fire_classes = det_cfg.get("fire_classes", [0, 1])
 
-    def detect_person(self, frame: np.ndarray) -> Tuple[bool, np.ndarray]:
+    def detect_person(self, frame: np.ndarray) -> Tuple[list, np.ndarray]:
         """
-        检测画面中的人员。
+        检测画面中的人员，返回检测详情。
 
         Args:
             frame: OpenCV BGR 视频帧。
 
         Returns:
-            (has_person, annotated_frame) 元组，has_person 为是否检测到人员，
+            (person_boxes, annotated_frame) 元组：
+            person_boxes 为检测到的人员列表，每项为
+            {"bbox": [x1, y1, x2, y2], "confidence": float}；
             annotated_frame 为带标注框的画面。
         """
-        results = self.person_model(frame, conf=self._person_conf, classes=self._person_classes, verbose=False)
-        has_person = False
+        results = self.person_model(frame, conf=self._person_conf, classes=self._person_classes, verbose=False, half=True)
+        person_boxes: list = []
         annotated_frame = frame.copy()
         for result in results:
+            for box in result.boxes:
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                conf = float(box.conf[0])
+                person_boxes.append({"bbox": [x1, y1, x2, y2], "confidence": conf})
             if len(result.boxes) > 0:
-                has_person = True
-            annotated_frame = result.plot()
-        return has_person, annotated_frame
+                annotated_frame = result.plot()
+        return person_boxes, annotated_frame
 
-    def detect_fire(self, frame: np.ndarray) -> Tuple[bool, np.ndarray]:
+    def detect_fire(self, frame: np.ndarray) -> Tuple[List[Dict], np.ndarray]:
         """
         检测画面中的火焰和烟雾（仅关注 fire 和 fire-smoke 类别）。
 
@@ -64,14 +69,22 @@ class YoloDetector:
             frame: OpenCV BGR 视频帧。
 
         Returns:
-            (has_fire, annotated_frame) 元组，has_fire 为是否检测到火焰/烟雾，
+            (fire_detections, annotated_frame) 元组：
+            fire_detections 为检测到的火焰/烟雾列表，每项含
+            {"class_id", "class_name", "confidence", "bbox"}；
             annotated_frame 为带标注框的画面。
         """
-        results = self.fire_model(frame, conf=self._fire_conf, classes=self._fire_classes, verbose=False)
-        has_fire = False
+        results = self.fire_model(frame, conf=self._fire_conf, classes=self._fire_classes, verbose=False, half=True)
+        fire_detections: List[Dict] = []
         annotated_frame = frame.copy()
         for result in results:
+            for box in result.boxes:
+                fire_detections.append({
+                    "class_id": int(box.cls[0]),
+                    "class_name": self.fire_model.names[int(box.cls[0])],
+                    "confidence": float(box.conf[0]),
+                    "bbox": box.xyxy[0].tolist(),
+                })
             if len(result.boxes) > 0:
-                has_fire = True
                 annotated_frame = result.plot()
-        return has_fire, annotated_frame
+        return fire_detections, annotated_frame

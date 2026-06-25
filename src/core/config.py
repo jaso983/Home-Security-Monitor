@@ -10,10 +10,10 @@ class ConfigReader:
 
     _DEFAULT_CONFIG: Dict[str, Any] = {
         "monitor": {"person_start": "00:00", "person_end": "23:59"},
-        "alarm": {"cooldown_seconds": 10},
-        "detection": {"person_conf": 0.8, "person_classes": [0], "fire_conf": 0.8, "fire_classes": [0, 1], "fire_model_path": ""},
+        "alarm": {"cooldown_seconds": 10, "iou_threshold": 0.2, "track_max_age": 90, "no_face_delay_seconds": 10, "no_face_night_delay_seconds": 3, "fire_stable_frames": 3, "smoke_stable_frames": 5, "person_stable_frames": 3, "person_alarm_gap": 5.0},
+        "detection": {"person_conf": 0.5, "person_classes": [0], "fire_conf": 0.70, "fire_classes": [0, 1], "fire_model_path": ""},
         "camera": {"device_id": 0, "width": 640, "height": 480},
-        "recognition": {"faces_dir": "src/models/family_faces", "tolerance": 80.0},
+        "recognition": {"faces_dir": "src/models/family_faces", "tolerance": 0.68},
         "gui": {"loop_delay_ms": 30, "fps_interval": 1.0, "min_width": 1024, "min_height": 700},
         "logging": {"level": "INFO", "file": "security_monitor.log"},
     }

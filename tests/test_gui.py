@@ -13,9 +13,13 @@ class TestGUIComponents(unittest.TestCase):
     """GUI 组件基础测试（不启动真实窗口）。"""
 
     def test_alarm_manager_integration(self) -> None:
-        """验证 AlarmManager 与 GUI 控制器的集成接口。"""
+        """验证 AlarmManager 与 GUI 控制器的集成接口（连续帧确认 + 冷却）。"""
         alarm_mgr = AlarmManager(cooldown_seconds=10)
+        # 连续 3 帧确认后触发
+        self.assertFalse(alarm_mgr.should_trigger_alarm("fire"))
+        self.assertFalse(alarm_mgr.should_trigger_alarm("fire"))
         self.assertTrue(alarm_mgr.should_trigger_alarm("fire"))
+        # 冷却内不触发
         self.assertFalse(alarm_mgr.should_trigger_alarm("fire"))
 
     def test_db_manager_integration(self) -> None:

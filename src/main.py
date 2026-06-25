@@ -14,16 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 def check_time_in_range(start_time_str: str, end_time_str: str) -> bool:
-    """
-    检查当前时间是否在指定时段内（支持跨午夜时段）。
-
-    Args:
-        start_time_str: 开始时间，格式 "HH:MM"。
-        end_time_str: 结束时间，格式 "HH:MM"。
-
-    Returns:
-        当前时间是否在时段内。
-    """
     now = datetime.now().time()
     start_time = datetime.strptime(start_time_str, "%H:%M").time()
     end_time = datetime.strptime(end_time_str, "%H:%M").time()
@@ -43,16 +33,25 @@ def main() -> None:
 
     logger.info("Initializing system components...")
 
-    # 初始化截图保存目录
     screenshot_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "screenshots")
     os.makedirs(screenshot_dir, exist_ok=True)
 
     detector = YoloDetector(config=cfg.config)
-    alarm_mgr = AlarmManager(cooldown=cfg.get("alarm", "cooldown_seconds", 10))
+    alarm_mgr = AlarmManager(
+        cooldown_seconds=cfg.get("alarm", "cooldown_seconds", 10),
+        iou_threshold=cfg.get("alarm", "iou_threshold", 0.2),
+        track_max_age=cfg.get("alarm", "track_max_age", 90),
+        no_face_delay_seconds=cfg.get("alarm", "no_face_delay_seconds", 10),
+        no_face_night_delay_seconds=cfg.get("alarm", "no_face_night_delay_seconds", 3),
+        person_alarm_gap=cfg.get("alarm", "person_alarm_gap", 5.0),
+        fire_stable_frames=cfg.get("alarm", "fire_stable_frames", 3),
+        smoke_stable_frames=cfg.get("alarm", "smoke_stable_frames", 5),
+        person_stable_frames=cfg.get("alarm", "person_stable_frames", 3),
+    )
     db = DatabaseManager()
     face_recognizer = FaceRecognizer(
         faces_dir=cfg.get("recognition", "faces_dir", ""),
-        tolerance=cfg.get("recognition", "tolerance", 80.0),
+        tolerance=cfg.get("recognition", "tolerance", 0.68),
     )
 
     cap = cv2.VideoCapture(cfg.get("camera", "device_id", 0))
@@ -69,48 +68,84 @@ def main() -> None:
                 break
 
             is_monitor_time = check_time_in_range(
-                cfg.get("monitor", "person_start", "23:00"),
-                cfg.get("monitor", "person_end", "06:00"),
+                cfg.get("monitor", "person_start", "00:00"),
+                cfg.get("monitor", "person_end", "23:59"),
             )
 
             display_frame = frame.copy()
-            has_person = False
+            pending_person_alarms: list = []
+            pending_fire_alarm = False
+
             if is_monitor_time:
-                has_person, person_frame = detector.detect_person(frame)
+                person_boxes, person_frame = detector.detect_person(frame)
                 display_frame = person_frame
-                cv2.putText(display_frame, "Night Security: ON", (10, 70),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
-                if has_person:
-                    is_stranger = face_recognizer.is_stranger(frame)
-                    if is_stranger and alarm_mgr.should_trigger_alarm("person"):
-                        timestamp = datetime.now()
-                        filename = f"person_{timestamp.strftime('%Y%m%d_%H%M%S')}.jpg"
-                        filepath = os.path.join(screenshot_dir, filename)
-                        cv2.imwrite(filepath, frame)
-                        db.insert_alarm("person", filepath)
-                        logger.warning("ALARM [person/stranger] at %s, screenshot: %s",
-                                       timestamp.strftime("%H:%M:%S"), filepath)
+                if person_boxes:
+                    # 只对需要人脸识别的人员框执行 DeepFace
+                    boxes_to_identify = alarm_mgr.get_boxes_needing_face_check(person_boxes)
+
+                    identity_results: list = []
+                    if boxes_to_identify:
+                        identity_results = face_recognizer.identify_faces(frame, boxes_to_identify)
+                    # 所有人员框都参与 track 匹配，未识别的保持原身份
+                    pending_person_alarms = alarm_mgr.update(person_boxes, identity_results, is_monitor_time)
+
+                    # 在 display_frame 上绘制身份标签（保存截图前标注）
+                    for ti in alarm_mgr.get_display_identities():
+                        x1, y1, x2, y2 = [int(v) for v in ti["bbox"]]
+                        identity = ti["identity"]
+                        if identity.startswith("member:"):
+                            label = f"[OK] {identity.split(':')[1]}"
+                            color = (0, 200, 0)
+                        elif identity == "stranger":
+                            label = "[ALERT] STRANGER"
+                            color = (0, 0, 255)
+                        elif identity == "no_face":
+                            label = "[ALERT] NO FACE"
+                            color = (0, 200, 255)
+                        else:
+                            label = "..."
+                            color = (180, 180, 180)
+                        cv2.putText(display_frame, label, (x1, y1 - 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+                if is_monitor_time:
+                    cv2.putText(display_frame, "Night Security: ON", (10, 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
             else:
-                cv2.putText(display_frame, "Night Security: OFF", (10, 70),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                cv2.putText(display_frame, "Night Security: OFF", (10, 55),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-            # 时间戳
             cv2.putText(display_frame, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-            # 全天候火焰/烟雾检测
-            has_fire, fire_frame = detector.detect_fire(frame)
+            # 火焰检测
+            fire_dets, fire_frame = detector.detect_fire(display_frame)
+            has_fire = len(fire_dets) > 0
             if has_fire:
                 display_frame = fire_frame
-                if alarm_mgr.should_trigger_alarm("fire"):
-                    timestamp = datetime.now()
-                    filename = f"fire_{timestamp.strftime('%Y%m%d_%H%M%S')}.jpg"
-                    filepath = os.path.join(screenshot_dir, filename)
-                    cv2.imwrite(filepath, frame)
-                    db.insert_alarm("fire", filepath)
-                    logger.warning("ALARM [fire] at %s, screenshot: %s",
-                                   timestamp.strftime("%H:%M:%S"), filepath)
+                if alarm_mgr.should_trigger_fire_alarm({d["class_id"] for d in fire_dets}):
+                    pending_fire_alarm = True
+
+            # 报警保存（标注完成后）
+            for alarm in pending_person_alarms:
+                timestamp = datetime.now()
+                filename = f"person_{timestamp.strftime('%Y%m%d_%H%M%S')}.jpg"
+                filepath = os.path.join(screenshot_dir, filename)
+                cv2.imwrite(filepath, display_frame)
+                db.insert_alarm("person", filepath)
+                logger.warning("ALARM [person/%s] at %s, screenshot: %s",
+                               alarm.get("reason", "unknown"),
+                               timestamp.strftime("%H:%M:%S"), filepath)
+
+            if pending_fire_alarm:
+                timestamp = datetime.now()
+                filename = f"fire_{timestamp.strftime('%Y%m%d_%H%M%S')}.jpg"
+                filepath = os.path.join(screenshot_dir, filename)
+                cv2.imwrite(filepath, display_frame)
+                db.insert_alarm("fire", filepath)
+                logger.warning("ALARM [fire] at %s, screenshot: %s",
+                               timestamp.strftime("%H:%M:%S"), filepath)
 
             cv2.imshow("Home Security Camera", display_frame)
 

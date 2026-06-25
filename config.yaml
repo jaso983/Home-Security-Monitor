@@ -5,13 +5,22 @@ monitor:
   person_end: "23:59"      # 人员检测结束时段
 
 alarm:
-  cooldown_seconds: 10     # 同类报警冷却时间（秒）
+  cooldown_seconds: 10       # 火焰报警冷却时间（秒）
+  iou_threshold: 0.2         # 人员追踪 IoU 匹配阈值（低一些容忍框抖动）
+  track_max_age: 90          # 人员 track 最大未匹配帧数（约3秒，容忍短暂遮挡）
+  no_face_delay_seconds: 10  # 白天无人脸延迟确认秒数
+  no_face_night_delay_seconds: 3  # 夜间无人脸延迟确认秒数（给人转身面对摄像头的时间）
+
+  fire_stable_frames: 3       # fire 连续确认帧数
+  smoke_stable_frames: 5      # smoke 连续确认帧数（更严格，抑制头发误检）
+  person_stable_frames: 3     # stranger/no_face 连续确认帧数
+  person_alarm_gap: 5.0       # 人员报警跨 track 间隔（秒）
 
 detection:
-  person_conf: 0.8         # 人员检测置信度阈值
+  person_conf: 0.5         # 人员检测置信度阈值（0.5足够可靠，0.8会漏检）
   person_classes: [0]       # 人员检测 COCO 类别（0=person）
-  fire_conf: 0.8           # 火焰检测置信度阈值
-  fire_classes: [0, 1]      # 火焰检测类别（自训练模型: 0=fire, 1=smoke）
+  fire_conf: 0.70          # 火焰检测置信度阈值（0.7避免头发等误报，验证集召回88%）
+  fire_classes: [0, 1]      # 火焰检测类别（v8n模型: 0=fire, 1=smoke）
   fire_model_path: ""       # 火焰模型路径，空则使用 src/models/fire_model.pt
 
 camera:
@@ -21,7 +30,7 @@ camera:
 
 recognition:
   faces_dir: "src/models/family_faces"  # 家庭成员照片目录
-  tolerance: 80.0                       # LBPH 置信度阈值，越小越严格
+  tolerance: 0.68                      # ArcFace 余弦距离阈值，越小越严格（0.68推荐，0.4极严格）
 
 gui:
   loop_delay_ms: 30        # GUI 检测循环间隔（毫秒）

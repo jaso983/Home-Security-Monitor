@@ -233,3 +233,6 @@ src/models/family_faces/*.npy
 
 # Claude Code
 .claude/
+
+# Benchmark artifacts
+benchmark_results.json
