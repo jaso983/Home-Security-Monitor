@@ -176,7 +176,8 @@ class SecurityApp:
         btn_row2 = tk.Frame(member_frame, bg=CARD)
         btn_row2.pack(fill=tk.X)
         self._make_btn(btn_row2, "Add Member", self._on_add_member, style="accent").pack(side=tk.LEFT, padx=(0, 4))
-        self._make_btn(btn_row2, "Reload Faces", self._on_reload_faces).pack(side=tk.LEFT)
+        self._make_btn(btn_row2, "Reload Faces", self._on_reload_faces).pack(side=tk.LEFT, padx=(0, 4))
+        self._make_btn(btn_row2, "Manage Members", self._on_manage_members, style="danger").pack(side=tk.LEFT)
 
         # System
         sys_frame = tk.Frame(ctrl, bg=CARD)
@@ -374,6 +375,79 @@ class SecurityApp:
         else:
             messagebox.showwarning("Reload Faces", "No valid face samples found.")
 
+    def _get_faces_dir(self) -> str:
+        faces_dir = self._cfg.get("recognition", "faces_dir", "")
+        if not faces_dir:
+            project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            faces_dir = os.path.join(project_dir, "models", "family_faces")
+        return faces_dir
+
+    def _on_manage_members(self) -> None:
+        faces_dir = self._get_faces_dir()
+        members = [f for f in os.listdir(faces_dir)
+                   if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp"))]
+        if not members:
+            messagebox.showinfo("Manage Members", "No registered members.")
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title("Manage Members")
+        win.configure(bg=CARD)
+        win.resizable(False, False)
+        win.transient(self.root)
+        win.grab_set()
+
+        tk.Label(win, text=f"Registered Members ({len(members)})", bg=CARD, fg=ACCENT,
+                 font=("", 10, "bold")).pack(padx=12, pady=(10, 6), anchor=tk.W)
+
+        list_frame = tk.Frame(win, bg=BG, highlightbackground=BORDER, highlightthickness=1)
+        list_frame.pack(padx=12, pady=(0, 6), fill=tk.BOTH, expand=True)
+
+        listbox = tk.Listbox(list_frame, bg=BG, fg=TEXT, selectbackground=ACCENT,
+                             selectforeground="#FFFFFF", font=("", 9),
+                             relief=tk.FLAT, highlightthickness=0, height=10)
+        scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, command=listbox.yview)
+        listbox.configure(yscrollcommand=scrollbar.set)
+        for m in members:
+            listbox.insert(tk.END, os.path.splitext(m)[0])
+        listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=2, pady=2)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        def delete_selected():
+            sel = listbox.curselection()
+            if not sel:
+                return
+            idx = sel[0]
+            name = members[idx]
+            if messagebox.askyesno("Delete Member", f"Delete '{os.path.splitext(name)[0]}'?",
+                                   parent=win):
+                os.remove(os.path.join(faces_dir, name))
+                listbox.delete(idx)
+                members.pop(idx)
+
+        def clear_all():
+            if messagebox.askyesno("Clear All", "Delete ALL member photos?", parent=win):
+                for m in members:
+                    os.remove(os.path.join(faces_dir, m))
+                members.clear()
+                listbox.delete(0, tk.END)
+
+        def on_close():
+            self.face_recognizer = FaceRecognizer(
+                faces_dir=faces_dir,
+                tolerance=self._cfg.get("recognition", "tolerance", 80.0),
+            )
+            self.alarm_mgr.reset_tracks()
+            win.destroy()
+
+        btn_frame = tk.Frame(win, bg=CARD)
+        btn_frame.pack(padx=12, pady=(0, 10), fill=tk.X)
+        self._make_btn(btn_frame, "Delete", delete_selected, style="danger").pack(side=tk.LEFT, padx=(0, 4))
+        self._make_btn(btn_frame, "Clear All", clear_all, style="danger").pack(side=tk.LEFT, padx=(0, 4))
+        self._make_btn(btn_frame, "Close", on_close).pack(side=tk.RIGHT)
+
+        win.protocol("WM_DELETE_WINDOW", on_close)
+
     def _on_add_member(self) -> None:
         """添加家庭成员：选择照片 → 输入名字 → 保存并重新训练。"""
         file_path = filedialog.askopenfilename(
@@ -388,10 +462,7 @@ class SecurityApp:
             return
         name = name.strip()
 
-        faces_dir = self._cfg.get("recognition", "faces_dir", "")
-        if not faces_dir:
-            project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            faces_dir = os.path.join(project_dir, "models", "family_faces")
+        faces_dir = self._get_faces_dir()
         os.makedirs(faces_dir, exist_ok=True)
 
         ext = os.path.splitext(file_path)[1] or ".jpg"

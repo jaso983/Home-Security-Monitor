@@ -1,0 +1,29 @@
+flowchart TD
+    A[person_boxes 输入] --> B[IoU 匹配 identity_result → person_box]
+    B --> C[计算所有 person_box × track IoU 对]
+    C --> D[按 IoU 降序贪心匹配]
+    D --> E{匹配成功?}
+    E -->|是| F[更新 track bbox + identity]
+    E -->|否| G[创建新 track]
+    D --> H{track 未匹配?}
+    H -->|是| I[miss_count++]
+    I --> J{miss_count > max_age?}
+    J -->|是| K[删除过期 track]
+    J -->|否| L[保留]
+    H -->|否| L
+
+    F --> M{身份判断}
+    G --> M
+    L --> M
+
+    M -->|member:xxx| N[不报警]
+    M -->|stranger| O[立即报警]
+    M -->|no_face| P{夜间?}
+    P -->|是| Q[延迟 3s 后报警]
+    P -->|否| R[延迟 10s 后报警]
+    M -->|pending| S[等待确认]
+
+    style O fill:#FF5252,color:#fff
+    style Q fill:#FF5252,color:#fff
+    style R fill:#FFB74D,color:#fff
+    style N fill:#4CAF50,color:#fff
