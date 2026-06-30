@@ -238,3 +238,8 @@ src/models/family_faces/*.npy
 
 # Benchmark artifacts
 benchmark_results.json
+
+# Course design submission ZIP
+*.zip
+# But keep the template zip
+!docs/软件工程课程设计-文档模板.zip

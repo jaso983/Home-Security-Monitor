@@ -367,7 +367,7 @@ class SecurityApp:
     def _on_reload_faces(self) -> None:
         self.face_recognizer = FaceRecognizer(
             faces_dir=self._cfg.get("recognition", "faces_dir", ""),
-            tolerance=self._cfg.get("recognition", "tolerance", 80.0),
+            tolerance=self._cfg.get("recognition", "tolerance", 0.68),
         )
         if self.face_recognizer.trained:
             messagebox.showinfo("Reload Faces",
@@ -435,7 +435,7 @@ class SecurityApp:
         def on_close():
             self.face_recognizer = FaceRecognizer(
                 faces_dir=faces_dir,
-                tolerance=self._cfg.get("recognition", "tolerance", 80.0),
+                tolerance=self._cfg.get("recognition", "tolerance", 0.68),
             )
             self.alarm_mgr.reset_tracks()
             win.destroy()
@@ -475,7 +475,7 @@ class SecurityApp:
 
         self.face_recognizer = FaceRecognizer(
             faces_dir=faces_dir,
-            tolerance=self._cfg.get("recognition", "tolerance", 80.0),
+            tolerance=self._cfg.get("recognition", "tolerance", 0.68),
         )
         if self.face_recognizer.trained:
             messagebox.showinfo("Member Added",
